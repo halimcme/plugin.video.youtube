@@ -1934,9 +1934,19 @@ class StreamInfo(YouTubeRequestClient):
                                    if default_lang['original'] == 'und' else
                                    default_lang['original']),
             )
+
+
+
             manifest_url, main_stream = self._generate_mpd_manifest(
                 video_data, audio_data, subs_data,
             )
+
+            # Check if we have valid audio streams with initRange
+            # This helps prevent MOOV atom issues with Cast Kodi extension
+            if audio_data and not any(stream.get('initRange') for _, streams in audio_data for stream in streams):
+                context.log_debug('No audio streams with initRange found - may cause MOOV atom issues')
+                # Don't fail completely, let the player try anyway
+                # The user can retry if needed
 
             if main_stream:
                 yt_format = self._get_stream_format(
@@ -2049,6 +2059,9 @@ class StreamInfo(YouTubeRequestClient):
 
                 init_range = stream.get('initRange')
                 if not init_range:
+                    # Log missing initRange for debugging Cast Kodi audio issues
+                    context.log_debug('Skipping stream itag {0} - missing initRange (MOOV atom issue)'
+                                      .format(itag))
                     continue
 
                 url = stream.get('url')
@@ -2277,6 +2290,8 @@ class StreamInfo(YouTubeRequestClient):
             context.log_debug('Generate MPD: No video mime-types found')
             return None, None
 
+
+
         def _stream_sort(stream, alt_sort=('alt_sort' in stream_features)):
             if not stream:
                 return (1,)
@@ -2330,6 +2345,8 @@ class StreamInfo(YouTubeRequestClient):
         # if (not video_data and not self._audio_only) or not audio_data:
         if not video_data or not audio_data:
             return None, None
+
+
 
         context = self._context
         log_error = context.log_error
